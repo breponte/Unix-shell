@@ -49,12 +49,9 @@ print_text:
 
     /**
      * TODO: echo behavior notes
-     * 1. flags can be repeated
-     * 2. flags can be separate or together (i.e. -n -e vs. -ne)
      * 3. the moment a non-flag argument appears, the rest is text argument
      * 4. single spaces between space-broken text argument
      * 5. invalid flags are considered text argument by default
-     * 6. flags are processed left to right (i.e. -eE vs -Ee)
      */
     return EXIT_SUCCESS;
 }

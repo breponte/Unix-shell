@@ -8,17 +8,17 @@
 int shell_loop()
 {
     while (1) {
-        char* command;
-        size_t bufferSize = 0;
-        int length = getline(&command, &bufferSize, stdin);
+        char* command = "";
+        int bufferSize = 0;
+        fgets(command, bufferSize, stdin);
         printf("Command: %s", command);
-        printf("Length: %d, Buffer Size: %ld\n", length, bufferSize);
+        printf("Buffer Size: %d\n", bufferSize);
         if (strcmp(command, "exit\n") == 0) break;
     }
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv)
 {
     // create a child to execute config file
     pid_t pid = fork();

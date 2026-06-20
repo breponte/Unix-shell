@@ -1,5 +1,6 @@
 # Executables
-main
+myshell
+bin/
 
 # Prerequisites
 *.d

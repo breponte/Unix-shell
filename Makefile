@@ -1,0 +1,19 @@
+CC = gcc
+CFLAGS = -Wall -Wextra -g -std=c17
+
+.PHONY: shell
+
+all: shell coreutils
+
+shell: shell/*.c
+	$(CC) $(CFLAGS) shell/*.c -o myshell
+
+coreutils: bin/
+	for f in coreutils/*.c; do $(CC) $(CFLAGS) "$$f" -o "bin/$$(basename "$$f" .c)"; done
+
+bin/:
+	mkdir bin
+
+clean:
+	rm -f myshell
+	rm -rf bin
