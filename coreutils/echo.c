@@ -13,7 +13,7 @@ int main(int argc, char** argv)
     argc--;
 
     // iterate through arguments until no flags are found
-    while (argc-- > 0 && **argv == '-') {
+    while (argc > 0 && **argv == '-') {
         // iterate through this arguments flags
         uint8_t tempFlags = flags;      // do not commit bad flag argument
         char* flagArg = *argv;
@@ -39,19 +39,27 @@ int main(int argc, char** argv)
                     goto print_text;
             }
         }
+
+        // commit temporary flags
         flags = tempFlags;
+
+        argc--;
         argv++;
     }
 
 print_text:
-    printf("Flags: %d\n", flags);
-    
+    // iterate through remaining arguments and print them
+    while (argc > 0) {
+        // iterate through current argument and character by character
+        char* textArg = *argv;
+        while (*textArg != '\0') {
+            putchar(*textArg++);
+        }
+        putchar(' ');
 
-    /**
-     * TODO: echo behavior notes
-     * 3. the moment a non-flag argument appears, the rest is text argument
-     * 4. single spaces between space-broken text argument
-     * 5. invalid flags are considered text argument by default
-     */
+        argv++;
+        argc--;
+    }
+
     return EXIT_SUCCESS;
 }

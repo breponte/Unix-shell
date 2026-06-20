@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -g -std=c17
 
-.PHONY: shell
+.PHONY: shell coreutils
 
 all: shell coreutils
 
