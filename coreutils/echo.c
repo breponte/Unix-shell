@@ -2,6 +2,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define ENABLE_NO_NEWLINE(flags)    (flags |= 0x2)      // 0b0010
+#define ENABLE_ESCAPE(flags)        (flags |= 0x1)      // 0b0001
+#define DISABLE_ESCAPE(flags)       (flags &= 0xE)      // 0b1110
+#define IS_NO_NEWLINE(flags)        (flags &  0x2)
+#define IS_ESCAPE(flags)            (flags &  0x1)
+
 int main(int argc, char** argv)
 {
     // list of flags
@@ -21,17 +27,17 @@ int main(int argc, char** argv)
             switch (*(flagArg)) {
                 // no new line
                 case 'n':
-                    tempFlags |= 0x2;   // 0b0010
+                    ENABLE_NO_NEWLINE(tempFlags);
                     break;
 
                 // recognize escape characters
                 case 'e':
-                    tempFlags |= 0x1;   // 0b0001
+                    ENABLE_ESCAPE(tempFlags);
                     break;
 
                 // don't recognize escape characters
                 case 'E':
-                    tempFlags &= 0xE;   // 0b1110
+                    DISABLE_ESCAPE(tempFlags);
                     break;
 
                 // invalid flag
@@ -55,11 +61,15 @@ print_text:
         while (*textArg != '\0') {
             putchar(*textArg++);
         }
-        putchar(' ');
+        // put space if between text arguments
+        if (argc > 1) putchar(' ');
 
         argv++;
         argc--;
     }
+
+    // put newline at the end according to the flag
+    if (!IS_NO_NEWLINE(flags)) putchar('\n'); 
 
     return EXIT_SUCCESS;
 }
