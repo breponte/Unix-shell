@@ -8,6 +8,31 @@
 #define IS_NO_NEWLINE(flags)        (flags &  0x2)
 #define IS_ESCAPE(flags)            (flags &  0x1)
 
+char handleEscape(char** textArg)
+{
+    // check next character following backslash
+    switch (*(++(*textArg))) {
+        case '\\': c = '\\';    break;
+        case 'a' : c = '\a';    break;
+        case 'b' : c = '\b';    break;
+        case 'c' :  goto exit_success;
+        case 'e' : c = '\x1B';  break;
+        case 'f' : c = '\f';    break;
+        case 'n' : c = '\n';    break;
+        case 'r' : c = '\r';    break;
+        case 't' : c = '\t';    break;
+        case 'v' : c = '\v';    break;
+        case '0' : c = '';
+            // TODO: Process following 3 octal numbers if any            
+            break;
+        case 'x' : c = '';
+            // TODO: Process following 2 hexadecimal numbers if any
+            break;
+        default:
+            putchar(**textArg);
+    }
+}
+
 int main(int argc, char** argv)
 {
     // list of flags
@@ -59,7 +84,10 @@ print_text:
         // iterate through current argument and character by character
         char* textArg = *argv;
         while (*textArg != '\0') {
-            putchar(*textArg++);
+            char c = *textArg;
+            if (*textArg == '\\') c = handleEscape(&textArg);
+            putchar(c);
+            textArg++;
         }
         // put space if between text arguments
         if (argc > 1) putchar(' ');
@@ -71,5 +99,6 @@ print_text:
     // put newline at the end according to the flag
     if (!IS_NO_NEWLINE(flags)) putchar('\n'); 
 
+exit_success:
     return EXIT_SUCCESS;
 }
