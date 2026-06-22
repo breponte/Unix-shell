@@ -10,27 +10,61 @@
 
 char handleEscape(char** textArg)
 {
+    char c = 0;
     // check next character following backslash
     switch (*(++(*textArg))) {
         case '\\': c = '\\';    break;
         case 'a' : c = '\a';    break;
         case 'b' : c = '\b';    break;
-        case 'c' :  goto exit_success;
+        case 'c' : exit(EXIT_SUCCESS);
         case 'e' : c = '\x1B';  break;
         case 'f' : c = '\f';    break;
         case 'n' : c = '\n';    break;
         case 'r' : c = '\r';    break;
         case 't' : c = '\t';    break;
         case 'v' : c = '\v';    break;
-        case '0' : c = '';
-            // TODO: Process following 3 octal numbers if any            
+        case '0' :
+            // process following 3 octal numbers if
+            for (int i = 0; i < 3; i++) {
+                c = c << 3;
+                // check if following character is an octal number
+                if (*((*textArg) + 1) >= '0' && *((*textArg) + 1) <= '7') {
+                    // convert char to octal
+                    c |= *((*textArg) + 1) - '0';
+                    (*textArg)++;
+                }
+                else break;
+            }
             break;
-        case 'x' : c = '';
-            // TODO: Process following 2 hexadecimal numbers if any
+        case 'x' :
+            // process following 2 hexadecimal numbers if any
+            for (int i = 0; i < 2; i++) {
+                c = c << 4;
+                // check if following character is hexadecimal number
+                // check if 0-9, decimal 0-9
+                if (*((*textArg) + 1) >= '0' && *((*textArg) + 1) <= '9') {
+                    // convert char to hex
+                    c |= *((*textArg) + 1) - '0';
+                    (*textArg)++;
+
+                // check if A-F, decimal 10-15
+                } else if (*((*textArg) + 1) >= 'A' && *((*textArg) + 1) <= 'F') {
+                    // convert char to hex
+                    c |= *((*textArg) + 1) - 'A' + (char)10;
+                    (*textArg)++;
+
+                // check if a-f, decimal 10-15
+                } else if (*((*textArg) + 1) >= 'a' && *((*textArg) + 1) <= 'f') {
+                    // convert char to hex 
+                    c |= *((*textArg) + 1) - 'a' + (char)10;
+                    (*textArg)++;
+                } else break;
+            }
             break;
         default:
-            putchar(**textArg);
+            c = **textArg;
     }
+    return c;
 }
 
 int main(int argc, char** argv)
@@ -85,7 +119,7 @@ print_text:
         char* textArg = *argv;
         while (*textArg != '\0') {
             char c = *textArg;
-            if (*textArg == '\\') c = handleEscape(&textArg);
+            if (IS_ESCAPE(flags) && *textArg == '\\') c = handleEscape(&textArg);
             putchar(c);
             textArg++;
         }
@@ -99,6 +133,5 @@ print_text:
     // put newline at the end according to the flag
     if (!IS_NO_NEWLINE(flags)) putchar('\n'); 
 
-exit_success:
     return EXIT_SUCCESS;
 }
