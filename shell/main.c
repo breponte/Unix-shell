@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include <unistd.h>
 #include <sys/wait.h>
 #include <stdio.h>
@@ -9,10 +11,35 @@ int shell_loop()
 {
     while (1) {
         char* command = "";
-        int bufferSize = 0;
-        fgets(command, bufferSize, stdin);
-        printf("Command: %s", command);
-        printf("Buffer Size: %d\n", bufferSize);
+        size_t bufferSize = 0;
+        getline(&command, &bufferSize, stdin);
+        
+        int argc = 0;
+        char* current = command;
+        char prevState = '\0';
+        while (*current != '\0') {
+            // TODO: Parse command line arguments into an array of strings, removing whitespace
+            // TODO: Handle quotes with spaces
+            switch (*current) {
+                case ' ':
+                    if (prevState != '\0') *current = '\0';
+                    break;
+                case '\\':
+                    if (prevState != '\0') *current = '\\';
+                    break;
+                case '\'':
+                    if (prevState != '\'') prevState = '\'';
+                    break;
+                case '\"':
+                    if (prevState != '\"') prevState = '\"';
+                    break;
+                default:
+                    break;
+            }
+
+            current++;
+        }
+        if (command) printf("Command:%s\n", command);
         if (strcmp(command, "exit\n") == 0) break;
     }
     return 0;
@@ -30,7 +57,7 @@ int main(int argc, char **argv)
     
     // child's execution path
     } else if (pid == 0) {
-        execl("./config.sh", "config.sh", (char *)NULL);
+        execl("./shell/config.sh", "config.sh", (char *)NULL);
 
         // execl failure
         fprintf(stderr, "Failed execl(), exit number %d\n", errno);
