@@ -6,6 +6,13 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <stdint.h>
+
+#define STATE_DEFAULT       0
+#define STATE_BACKSLASH     1
+#define STATE_DOUBLEQUOTE   2
+#define STATE_SINGLEQUOTE   3
+#define STATE_SPACES        4
 
 int shell_loop()
 {
@@ -15,32 +22,77 @@ int shell_loop()
         getline(&command, &bufferSize, stdin);
         
         int argc = 0;
-        char* current = command;
-        char prevState = '\0';
-        while (*current != '\0') {
-            // TODO: Parse command line arguments into an array of strings, removing whitespace
-            // TODO: Handle quotes with spaces
-            switch (*current) {
-                case ' ':
-                    if (prevState != '\0') *current = '\0';
+        char* newCommand = malloc(bufferSize);
+        uint8_t state = STATE_DEFAULT;
+        int i = 0;
+        while (*command != '\0') {
+            switch (state) {
+                case STATE_DEFAULT:
+state_default:
+                    // set null delimiter between arguments
+                    if (*command == ' ') {
+                        state = STATE_SPACES;
+                        *(newCommand + i) = '#';
+                    // escape character prints next character, ignoring self
+                    } else if (*command == '\\') {
+                        state = STATE_BACKSLASH;
+                        i--;
+                    // start of double quote, searching for ending quote
+                    } else if (*command == '\"') {
+                        state = STATE_DOUBLEQUOTE; 
+                        *(newCommand + i) = '\"';
+                    // start of single quote, searching for ending quote
+                    } else if (*command == '\'') {
+                        state = STATE_SINGLEQUOTE; 
+                        *(newCommand + i) = '\'';
+                    // otherwise, print character normally
+                    } else {
+                        *(newCommand + i) = *command;
+                    }
                     break;
-                case '\\':
-                    if (prevState != '\0') *current = '\\';
+                case STATE_BACKSLASH:
+                    // prints next character, regardless
+                    state = STATE_DEFAULT;
+                    *(newCommand + i) = *command;
                     break;
-                case '\'':
-                    if (prevState != '\'') prevState = '\'';
+                case STATE_DOUBLEQUOTE:
+                    // found ending quote
+                    if (*command == '\"') {
+                        state = STATE_DEFAULT;
+                        *(newCommand + i) = '\"';
+                    // otherwise, print character normally, even backslashes
+                    } else {
+                        *(newCommand + i) = *command;
+                    }
                     break;
-                case '\"':
-                    if (prevState != '\"') prevState = '\"';
+                case STATE_SINGLEQUOTE:
+                    // found ending quote
+                    if (*command == '\'') {
+                        state = STATE_DEFAULT;
+                        *(newCommand + i) = '\'';
+                    // otherwise, print character normally, even backslashes
+                    } else {
+                        *(newCommand + i) = *command;
+                    }
+                    break;
+                case STATE_SPACES:
+                    // ignore whitespace between arguments
+                    if (*command == ' ') {
+                        i--;
+                    // new argument found, process as in default state
+                    } else {
+                        state = STATE_DEFAULT;
+                        goto state_default;
+                    }
                     break;
                 default:
                     break;
             }
-
-            current++;
+            i++;
+            command++;
         }
-        if (command) printf("Command:%s\n", command);
-        if (strcmp(command, "exit\n") == 0) break;
+        if (newCommand) printf("Command:%s\n", newCommand);
+        if (strcmp(newCommand, "exit\n") == 0) break;
     }
     return 0;
 }
