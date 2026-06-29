@@ -8,23 +8,50 @@
 #include <string.h>
 #include <stdint.h>
 
-#define STATE_DEFAULT       0
-#define STATE_BACKSLASH     1
-#define STATE_DOUBLEQUOTE   2
-#define STATE_SINGLEQUOTE   3
-#define STATE_SPACES        4
+#define STATE_DEFAULT                   0
+#define STATE_BACKSLASH                 1
+#define STATE_DOUBLEQUOTE               2
+#define STATE_SINGLEQUOTE               3
+#define STATE_SPACES                    4
+
+#define EXIT_SUCCESS                    0
+#define EXIT_FAIL_FORK                  1
+#define EXIT_FAIL_WAITPID               2
+#define EXIT_FAIL_ARGV_MALLOC           3
+#define EXIT_FAIL_CMD_BUFFER_MALLOC     4
+#define EXIT_FAIL_UNRECOGNIZED_STATE    5
+#define EXIT_FAIL_ARGV_REALLOC          6
+#define EXIT_FAIL_CMD_BUFFER_REALLOC    7
 
 int shell_loop()
 {
     while (1) {
-        char* command = "";
+        /**
+         * https://github.com/coreutils/gnulib/blob/master/lib/getdelim.c
+         * getline() uses getdelim() for '\n', realloc used so memory handling
+         * is specified via char * pointer and buffer size
+         */
+        char* command = NULL;
         size_t bufferSize = 0;
         getline(&command, &bufferSize, stdin);
         
-        int argc = 0;
+        // build command line arguments, malloc maximum amount of arguments
+        // argc starts at one, increments on space to default state transition
+        int argc = 1;
+        char** argv = malloc(bufferSize * sizeof(char*));
         char* newCommand = malloc(bufferSize);
+        if (argv == NULL) {
+            fprintf(stderr, "argv malloc failed.\n");
+            exit(EXIT_FAIL_ARGV_MALLOC);
+        }
+        if (newCommand == NULL) {
+            fprintf(stderr, "Command buffer malloc failed.\n");
+            exit(EXIT_FAIL_CMD_BUFFER_MALLOC);
+        }
+
         uint8_t state = STATE_DEFAULT;
         int i = 0;
+        // iterate through user input, parsing arguments by ' ' space delimiter
         while (*command != '\0') {
             switch (state) {
                 case STATE_DEFAULT:
@@ -82,19 +109,39 @@ state_default:
                     // new argument found, process as in default state
                     } else {
                         state = STATE_DEFAULT;
+                        argc++;
                         goto state_default;
                     }
                     break;
                 default:
-                    break;
+                    // unrecognized state
+                    fprintf(stderr, "Unrecognized state, %d\n", state);
+                    exit(EXIT_FAIL_UNRECOGNIZED_STATE);
             }
             i++;
             command++;
         }
-        if (newCommand) printf("Command:%s\n", newCommand);
+        // realloc argv to hold as many arguments was found via argc
+        argv = realloc(argv, (size_t)argc * sizeof(char *));
+        // realloc command buffer to how many was written
+        newCommand = realloc(newCommand, (size_t)i * sizeof(char *));
+        if (argv == NULL) {
+            fprintf(stderr, "argv realloc failed.\n");
+            exit(EXIT_FAIL_ARGV_REALLOC);
+        }
+        if (newCommand == NULL) {
+            fprintf(stderr, "Command buffer realloc failed.\n");
+            exit(EXIT_FAIL_CMD_BUFFER_REALLOC);
+        }
+
+        printf("Parsed Command: ");
+        for (int j = 0; j < argc; j++) {
+            printf("%s\t", *(argv + j));
+        }
+        putchar('\n');
         if (strcmp(newCommand, "exit\n") == 0) break;
     }
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 int main(int argc, char **argv)
@@ -105,7 +152,7 @@ int main(int argc, char **argv)
     // fork failure
     if (pid == -1) {
         perror("fork");
-        return EXIT_FAILURE; 
+        exit(EXIT_FAIL_FORK);
     
     // child's execution path
     } else if (pid == 0) {
@@ -124,7 +171,7 @@ int main(int argc, char **argv)
     if (waitpid(pid, &configStatus, 0) == -1) {
         // waitpid failure
         perror("waitpid");
-        return EXIT_FAILURE;
+       exit(EXIT_FAIL_WAITPID);
     }
 
     // check exit status of child process
