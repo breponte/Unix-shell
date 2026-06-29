@@ -48,6 +48,8 @@ int shell_loop()
             fprintf(stderr, "Command buffer malloc failed.\n");
             exit(EXIT_FAIL_CMD_BUFFER_MALLOC);
         }
+        // set first argument
+        *argv = newCommand;
 
         uint8_t state = STATE_DEFAULT;
         int i = 0;
@@ -59,7 +61,7 @@ state_default:
                     // set null delimiter between arguments
                     if (*command == ' ') {
                         state = STATE_SPACES;
-                        *(newCommand + i) = '#';
+                        *(newCommand + i) = '\0';
                     // escape character prints next character, ignoring self
                     } else if (*command == '\\') {
                         state = STATE_BACKSLASH;
@@ -109,6 +111,7 @@ state_default:
                     // new argument found, process as in default state
                     } else {
                         state = STATE_DEFAULT;
+                        *(argv + argc) = newCommand + i;
                         argc++;
                         goto state_default;
                     }
@@ -139,7 +142,7 @@ state_default:
             printf("%s\t", *(argv + j));
         }
         putchar('\n');
-        if (strcmp(newCommand, "exit\n") == 0) break;
+        if (strcmp(*argv, "exit") == 0) break;
     }
     return EXIT_SUCCESS;
 }
