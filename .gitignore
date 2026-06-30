@@ -1,5 +1,9 @@
 # Executables
-main
+myshell
+bin/
+
+# Tests
+tests/*/out/*
 
 # Prerequisites
 *.d
