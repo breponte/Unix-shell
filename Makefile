@@ -17,3 +17,4 @@ bin/:
 clean:
 	rm -f myshell
 	rm -rf bin
+	rm -rf ./tests/*/out/*
