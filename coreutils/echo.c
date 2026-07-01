@@ -48,12 +48,14 @@ char handleEscape(char** textArg)
 
                 // check if A-F, decimal 10-15
                 } else if (*((*textArg) + 1) >= 'A' && *((*textArg) + 1) <= 'F') {
+                    c = c << 4;
                     // convert char to hex
                     c |= *((*textArg) + 1) - 'A' + (char)10;
                     (*textArg)++;
 
                 // check if a-f, decimal 10-15
                 } else if (*((*textArg) + 1) >= 'a' && *((*textArg) + 1) <= 'f') {
+                    c = c << 4;
                     // convert char to hex 
                     c |= *((*textArg) + 1) - 'a' + (char)10;
                     (*textArg)++;
