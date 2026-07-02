@@ -4,6 +4,7 @@ bin/
 
 # Tests
 tests/*/out/*
+tests/*/exp/*
 
 # Prerequisites
 *.d
