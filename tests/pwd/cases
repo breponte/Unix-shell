@@ -1,0 +1,4 @@
+pwd
+pwd -P
+pwd -L
+rm -rf ./tmp/pt && mkdir -p ./tmp/pt/real && ln -s "$(pwd)/tmp/pt/real" ./tmp/pt/link; ( cd ./tmp/pt/link && printf '%s\n%s\n' "$(pwd -L)" "$(pwd -P)" ) && rm -rf ./tmp

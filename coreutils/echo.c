@@ -8,6 +8,8 @@
 #define IS_NO_NEWLINE(flags)        (flags &  0x2)
 #define IS_ESCAPE(flags)            (flags &  0x1)
 
+#define EXIT_SUCCESS                0
+
 char handleEscape(char** textArg)
 {
     char c = 0;

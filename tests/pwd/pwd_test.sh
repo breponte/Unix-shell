@@ -3,9 +3,9 @@
 # define fail behavior
 set -euo pipefail
 
-original_cmd="echo"
-cmd="./bin/echo"
-path_test="./tests/echo"
+original_cmd="pwd"
+cmd="./bin/pwd"
+path_test="./tests/pwd"
 num_tests=$(wc -l < "$path_test/cases")
 failed_tests=()
 
@@ -23,9 +23,10 @@ get_diff () {
     fi
 }
 
-echo "Test Suite for coreutils 'echo'"
+echo -e "\nTest Suite for coreutils 'pwd'"
 
-sed "s/$original_cmd/.\/bin\/$original_cmd/g" $path_test/cases > $path_test/my_cases
+# since testing symlinks, manual editing of line 4 command necessary due to cd
+sed "s/$original_cmd/.\/bin\/$original_cmd/" $path_test/cases > $path_test/my_cases
 
 for i in $(seq 1 $num_tests); do
     sed "${i}q;d" "$path_test/cases" | bash > "$path_test/exp/exp$i"
