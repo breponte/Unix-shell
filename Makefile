@@ -11,7 +11,7 @@ shell: shell/*.c
 coreutils: bin/
 	for f in coreutils/*.c; do $(CC) $(CFLAGS) "$$f" -o "bin/$$(basename "$$f" .c)"; done
 
-test: shell
+test: shell coreutils
 	for t in tests/*/*.sh; do $$t; done
 
 bin/:
