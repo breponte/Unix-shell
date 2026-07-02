@@ -137,12 +137,57 @@ state_default:
             exit(EXIT_FAIL_CMD_BUFFER_REALLOC);
         }
 
-        printf("Parsed Command: ");
-        for (int j = 0; j < argc; j++) {
-            printf("%s\t", *(argv + j));
+        // terminate when received exit
+        if (strcmp(*argv, "exit\n") == 0 || strcmp(*argv, "exit") == 0) break;
+        printf("Command: %s\n", *argv);
+
+        // create a child to execute config file
+        pid_t pid = fork();
+
+        // fork failure
+        if (pid == -1) {
+            perror("fork");
+            exit(EXIT_FAIL_FORK);
+        
+        // child's execution path
+        } else if (pid == 0) {
+            char* binPath =
+                malloc((strlen("./bin/") * sizeof(char)) + strlen(*argv));
+            binPath = "./bin/path";
+            strcat(binPath, *argv);
+            execv(binPath, argv);
+            execv("./", argv);
+
+            // execl failure
+            fprintf(stderr, "Failed execv(), exit number %d\n", errno);
+            perror("execv");
+            _exit(127);
         }
+
+        // parent execution from this point on...
+        
+        // wait on child's termination
+        int configStatus = 0;
+        if (waitpid(pid, &configStatus, 0) == -1) {
+            // waitpid failure
+            perror("waitpid");
+           exit(EXIT_FAIL_WAITPID);
+        }
+
+        // check exit status of child process
+        // child exited via exit()
+        if (WIFEXITED(configStatus)) {
+            int code = WEXITSTATUS(configStatus);
+            // child's exit code is not successful
+            if (code != 0)
+                fprintf(stderr, "Child failed, exit code %d\n", code);
+        // child exited via signal, not successful
+        } else if (WIFSIGNALED(configStatus)) {
+            int sig = WTERMSIG(configStatus);
+            fprintf(stderr, "Child killed by signal %d\n", sig);
+        }
+
         putchar('\n');
-        if (strcmp(*argv, "exit") == 0) break;
     }
     return EXIT_SUCCESS;
 }
