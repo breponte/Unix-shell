@@ -26,35 +26,36 @@ char handleEscape(char** textArg)
         case '0' :
             // process following 3 octal numbers if
             for (int i = 0; i < 3; i++) {
-                c = c << 3;
                 // check if following character is an octal number
                 if (*((*textArg) + 1) >= '0' && *((*textArg) + 1) <= '7') {
+                    c = c << 3;
                     // convert char to octal
                     c |= *((*textArg) + 1) - '0';
                     (*textArg)++;
-                }
-                else break;
+                } else break;
             }
             break;
         case 'x' :
             // process following 2 hexadecimal numbers if any
             for (int i = 0; i < 2; i++) {
-                c = c << 4;
                 // check if following character is hexadecimal number
                 // check if 0-9, decimal 0-9
                 if (*((*textArg) + 1) >= '0' && *((*textArg) + 1) <= '9') {
+                    c = c << 4;
                     // convert char to hex
                     c |= *((*textArg) + 1) - '0';
                     (*textArg)++;
 
                 // check if A-F, decimal 10-15
                 } else if (*((*textArg) + 1) >= 'A' && *((*textArg) + 1) <= 'F') {
+                    c = c << 4;
                     // convert char to hex
                     c |= *((*textArg) + 1) - 'A' + (char)10;
                     (*textArg)++;
 
                 // check if a-f, decimal 10-15
                 } else if (*((*textArg) + 1) >= 'a' && *((*textArg) + 1) <= 'f') {
+                    c = c << 4;
                     // convert char to hex 
                     c |= *((*textArg) + 1) - 'a' + (char)10;
                     (*textArg)++;
