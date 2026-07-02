@@ -21,3 +21,4 @@ clean:
 	rm -f myshell
 	rm -rf bin
 	rm -rf ./tests/*/out/*
+	rm -rf ./tests/*/exp/*
