@@ -59,7 +59,7 @@ int shell_loop()
                 case STATE_DEFAULT:
 state_default:
                     // set null delimiter between arguments
-                    if (*command == ' ') {
+                    if (*command == ' ' || *command == '\n') {
                         state = STATE_SPACES;
                         *(newCommand + i) = '\0';
                     // escape character prints next character, ignoring self
@@ -125,7 +125,7 @@ state_default:
             command++;
         }
         // realloc argv to hold as many arguments was found via argc
-        argv = realloc(argv, (size_t)argc * sizeof(char *));
+        argv = realloc(argv, ((size_t)argc * sizeof(char *)) + sizeof(char *));
         // realloc command buffer to how many was written
         newCommand = realloc(newCommand, (size_t)i * sizeof(char *));
         if (argv == NULL) {
@@ -136,13 +136,61 @@ state_default:
             fprintf(stderr, "Command buffer realloc failed.\n");
             exit(EXIT_FAIL_CMD_BUFFER_REALLOC);
         }
+        // execv expects last element to be NULL to prevent reading forever
+        *(argv + argc) = NULL;
 
-        printf("Parsed Command: ");
-        for (int j = 0; j < argc; j++) {
-            printf("%s\t", *(argv + j));
-        }
-        putchar('\n');
+        // terminate when received exit
         if (strcmp(*argv, "exit") == 0) break;
+
+        // create a child to execute config file
+        pid_t pid = fork();
+
+        // fork failure
+        if (pid == -1) {
+            perror("fork");
+            exit(EXIT_FAIL_FORK);
+        
+        // child's execution path
+        } else if (pid == 0) {
+
+            char* binPath = malloc(
+                (strlen("./bin/") * sizeof(char)) +
+                (strlen(*argv) * sizeof(char)) +
+                1	
+            );
+            strcpy(binPath, "./bin/");
+            strcat(binPath, *argv);
+            execv(binPath, argv);
+            execv(*argv, argv);
+
+            // execl failure
+            fprintf(stderr, "Failed execv(), exit number %d\n", errno);
+            perror("execv");
+            _exit(127);
+        }
+
+        // parent execution from this point on...
+        
+        // wait on child's termination
+        int configStatus = 0;
+        if (waitpid(pid, &configStatus, 0) == -1) {
+            // waitpid failure
+            perror("waitpid");
+           exit(EXIT_FAIL_WAITPID);
+        }
+
+        // check exit status of child process
+        // child exited via exit()
+        if (WIFEXITED(configStatus)) {
+            int code = WEXITSTATUS(configStatus);
+            // child's exit code is not successful
+            if (code != 0)
+                fprintf(stderr, "Child failed, exit code %d\n", code);
+        // child exited via signal, not successful
+        } else if (WIFSIGNALED(configStatus)) {
+            int sig = WTERMSIG(configStatus);
+            fprintf(stderr, "Child killed by signal %d\n", sig);
+        }
     }
     return EXIT_SUCCESS;
 }
