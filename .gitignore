@@ -5,6 +5,8 @@ bin/
 # Tests
 tests/*/out/*
 tests/*/exp/*
+!tests/*/out/.gitkeep
+!tests/*/exp/.gitkeep
 
 # Prerequisites
 *.d

@@ -13,7 +13,7 @@ coreutils: bin/
 	for e in bin/*; do chmod +x $$e; done
 
 test: shell coreutils
-	for t in tests/*/*.sh; do $$t; done
+	for t in tests/*/*.sh; do chmod +x $$t & $$t; done
 
 bin/:
 	mkdir bin
