@@ -38,8 +38,9 @@ int shell_loop()
         // build command line arguments, malloc maximum amount of arguments
         // argc starts at one, increments on space to default state transition
         int argc = 1;
-        char** argv = malloc(bufferSize * sizeof(char*));
-        char* newCommand = malloc(bufferSize);
+        char** argv = malloc(bufferSize * sizeof(char *) + sizeof(char *));
+        char* newCommand = malloc(bufferSize); 
+        char* redirections = malloc(bufferSize);
         if (argv == NULL) {
             fprintf(stderr, "argv malloc failed.\n");
             exit(EXIT_FAIL_ARGV_MALLOC);
@@ -48,11 +49,13 @@ int shell_loop()
             fprintf(stderr, "Command buffer malloc failed.\n");
             exit(EXIT_FAIL_CMD_BUFFER_MALLOC);
         }
+        // TODO: MALLOC CHECK
         // set first argument
         *argv = newCommand;
 
         uint8_t state = STATE_DEFAULT;
         int i = 0;
+        int iRedirect = 0;
         // iterate through user input, parsing arguments by ' ' space delimiter
         while (*command != '\0') {
             switch (state) {
@@ -75,6 +78,20 @@ state_default:
                         state = STATE_SINGLEQUOTE; 
                         *(newCommand + i) = '\'';
                     // otherwise, print character normally
+                    } else if (*command == '>' || *command == '<') {
+                        *(redirections + iRedirect) = *command;
+                        *(redirections + iRedirect + 1) = '\0';
+                        iRedirect += 2;
+                        i--;
+                    } else if ((*command == '>' && *(command+1) == '>') ||
+                            (*command == '2' && *(command+1) == '>') ||
+                            (*command == '&' && *(command+1) == '>')) {
+                        *(redirections + iRedirect) = *command;
+                        command++;
+                        *(redirections + iRedirect + 1) = *command;
+                        *(redirections + iRedirect + 2) = '\0';
+                        iRedirect += 3;
+                        i--;
                     } else {
                         *(newCommand + i) = *command;
                     }
@@ -127,7 +144,7 @@ state_default:
         // realloc argv to hold as many arguments was found via argc
         argv = realloc(argv, ((size_t)argc * sizeof(char *)) + sizeof(char *));
         // realloc command buffer to how many was written
-        newCommand = realloc(newCommand, (size_t)i * sizeof(char *));
+        newCommand = realloc(newCommand, (size_t)i * sizeof(char) + sizeof(char));
         if (argv == NULL) {
             fprintf(stderr, "argv realloc failed.\n");
             exit(EXIT_FAIL_ARGV_REALLOC);
@@ -138,25 +155,30 @@ state_default:
         }
         // execv expects last element to be NULL to prevent reading forever
         *(argv + argc) = NULL;
-
         // terminate when received exit
         if (strcmp(*argv, "exit") == 0) break;
 
+        // evaluate redirection        
+        int j = 0;
+        while (*(argv + i) != NULL) {
+             
+            j++;
+        }
+
         // create a child to execute config file
         pid_t pid = fork();
-
         // fork failure
         if (pid == -1) {
             perror("fork");
             exit(EXIT_FAIL_FORK);
-        
+
         // child's execution path
         } else if (pid == 0) {
 
             char* binPath = malloc(
                 (strlen("./bin/") * sizeof(char)) +
                 (strlen(*argv) * sizeof(char)) +
-                1	
+                sizeof(char)	
             );
             strcpy(binPath, "./bin/");
             strcat(binPath, *argv);
