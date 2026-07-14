@@ -23,15 +23,21 @@
 #define EXIT_FAIL_ARGV_REALLOC          6
 #define EXIT_FAIL_CMD_BUFFER_REALLOC    7
 #define EXIT_FAIL_REDIRECT_MALLOC       8
+#define EXIT_FAIL_REDIRECT_PARSE        9
 
 void processRedirectTarget(char** command, char** redirectionsPtr, int* i)
 {
-    while (**command != ' ') {
+    while (**command == ' ' && **command != '\0') {
         (*command)++;
     }
 
+    if (**command == '\0') {
+        fprintf(stderr, "Redirect has broken target\n");
+        exit(EXIT_FAIL_REDIRECT_PARSE);
+    }
+
     uint8_t state = STATE_DEFAULT;
-    while (**command != ' ') {
+    while (**command != ' ' && **command != '\0') {
         switch (state) {
             case STATE_DEFAULT:
                 // set null delimiter between arguments
@@ -49,17 +55,19 @@ void processRedirectTarget(char** command, char** redirectionsPtr, int* i)
                 } else if (**command == '\'') {
                     state = STATE_SINGLEQUOTE; 
                     *(*redirectionsPtr + *i) = '\'';
-                // otherwise, print character normally
-                } else if (**command == '>' || **command == '<') {
-                    *(*redirectionsPtr + *i) = '\0';
-                    (*i)++;
-                    return;
+                // process two character redirection
                 } else if ((**command == '>' && *(*command+1) == '>') ||
                         (**command == '2' && *(*command+1) == '>') ||
                         (**command == '&' && *(*command+1) == '>')) {
                     (*i)++;
                     *(*redirectionsPtr + *i) = '\0';
                     return;
+                // process single character redirection
+                } else if (**command == '>' || **command == '<') {
+                    *(*redirectionsPtr + *i) = '\0';
+                    (*i)++;
+                    return;
+                // otherwise, print character normally
                 } else {
                     *(*redirectionsPtr + *i) = **command;
                 }
@@ -156,13 +164,7 @@ state_default:
                     } else if (*command == '\'') {
                         state = STATE_SINGLEQUOTE; 
                         *(newCommand + i) = '\'';
-                    // otherwise, print character normally
-                    } else if (*command == '>' || *command == '<') {
-                        *(redirections + iRedirect) = *command;
-                        *(redirections + iRedirect + 1) = '\0';
-                        iRedirect += 2;
-                        i--;
-                        processRedirectTarget(&command, &redirections, &iRedirect);
+                    // process two character redirection
                     } else if ((*command == '>' && *(command+1) == '>') ||
                             (*command == '2' && *(command+1) == '>') ||
                             (*command == '&' && *(command+1) == '>')) {
@@ -171,8 +173,18 @@ state_default:
                         *(redirections + iRedirect + 1) = *command;
                         *(redirections + iRedirect + 2) = '\0';
                         iRedirect += 3;
+                        command++;
                         i--;
                         processRedirectTarget(&command, &redirections, &iRedirect);
+                    // process single character redirection
+                    } else if (*command == '>' || *command == '<') {
+                        *(redirections + iRedirect) = *command;
+                        *(redirections + iRedirect + 1) = '\0';
+                        iRedirect += 2;
+                        command++;
+                        i--;
+                        processRedirectTarget(&command, &redirections, &iRedirect);
+                    // otherwise, print character normally
                     } else {
                         *(newCommand + i) = *command;
                     }
@@ -239,8 +251,10 @@ state_default:
         // terminate when received exit
         if (strcmp(*argv, "exit") == 0) break;
 
+        // redirection parsing
         for (int j = 0; j < iRedirect; j++) {
-            putchar(*(redirections + j));
+            if (*(redirections + j) != '\0')
+                putchar(*(redirections + j));
         }
         putchar('\n');
 
