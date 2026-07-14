@@ -22,6 +22,82 @@
 #define EXIT_FAIL_UNRECOGNIZED_STATE    5
 #define EXIT_FAIL_ARGV_REALLOC          6
 #define EXIT_FAIL_CMD_BUFFER_REALLOC    7
+#define EXIT_FAIL_REDIRECT_MALLOC       8
+
+void processRedirectTarget(char** command, char** redirectionsPtr, int* i)
+{
+    while (**command != ' ') {
+        (*command)++;
+    }
+
+    uint8_t state = STATE_DEFAULT;
+    while (**command != ' ') {
+        switch (state) {
+            case STATE_DEFAULT:
+                // set null delimiter between arguments
+                if (**command == ' ' || **command == '\n') {
+                    *(*redirectionsPtr + *i) = '\0';
+                // escape character prints next character, ignoring self
+                } else if (**command == '\\') {
+                    state = STATE_BACKSLASH;
+                    (*i)--;
+                // start of double quote, searching for ending quote
+                } else if (**command == '\"') {
+                    state = STATE_DOUBLEQUOTE; 
+                    *(*redirectionsPtr + *i) = '\"';
+                // start of single quote, searching for ending quote
+                } else if (**command == '\'') {
+                    state = STATE_SINGLEQUOTE; 
+                    *(*redirectionsPtr + *i) = '\'';
+                // otherwise, print character normally
+                } else if (**command == '>' || **command == '<') {
+                    *(*redirectionsPtr + *i) = '\0';
+                    (*i)++;
+                    return;
+                } else if ((**command == '>' && *(*command+1) == '>') ||
+                        (**command == '2' && *(*command+1) == '>') ||
+                        (**command == '&' && *(*command+1) == '>')) {
+                    (*i)++;
+                    *(*redirectionsPtr + *i) = '\0';
+                    return;
+                } else {
+                    *(*redirectionsPtr + *i) = **command;
+                }
+                break;
+            case STATE_BACKSLASH:
+                // prints next character, regardless
+                state = STATE_DEFAULT;
+                *(*redirectionsPtr + *i) = **command;
+                break;
+            case STATE_DOUBLEQUOTE:
+                // found ending quote
+                if (**command == '\"') {
+                    state = STATE_DEFAULT;
+                    *(*redirectionsPtr + *i) = '\"';
+                // otherwise, print character normally, even backslashes
+                } else {
+                    *(*redirectionsPtr + *i) = **command;
+                }
+                break;
+            case STATE_SINGLEQUOTE:
+                // found ending quote
+                if (**command == '\'') {
+                    state = STATE_DEFAULT;
+                    *(*redirectionsPtr + *i) = '\'';
+                // otherwise, print character normally, even backslashes
+                } else {
+                    *(*redirectionsPtr + *i) = **command;
+                }
+                break;
+            default:
+                // unrecognized state
+                fprintf(stderr, "Unrecognized state, %d\n", state);
+                exit(EXIT_FAIL_UNRECOGNIZED_STATE);
+        }
+        (*i)++;
+        (*command)++;
+    }
+}
 
 int shell_loop()
 {
@@ -49,7 +125,10 @@ int shell_loop()
             fprintf(stderr, "Command buffer malloc failed.\n");
             exit(EXIT_FAIL_CMD_BUFFER_MALLOC);
         }
-        // TODO: MALLOC CHECK
+        if (redirections == NULL) {
+            fprintf(stderr, "Redirections buffer malloc failed.\n");
+            exit(EXIT_FAIL_REDIRECT_MALLOC);
+        }
         // set first argument
         *argv = newCommand;
 
@@ -83,6 +162,7 @@ state_default:
                         *(redirections + iRedirect + 1) = '\0';
                         iRedirect += 2;
                         i--;
+                        processRedirectTarget(&command, &redirections, &iRedirect);
                     } else if ((*command == '>' && *(command+1) == '>') ||
                             (*command == '2' && *(command+1) == '>') ||
                             (*command == '&' && *(command+1) == '>')) {
@@ -92,6 +172,7 @@ state_default:
                         *(redirections + iRedirect + 2) = '\0';
                         iRedirect += 3;
                         i--;
+                        processRedirectTarget(&command, &redirections, &iRedirect);
                     } else {
                         *(newCommand + i) = *command;
                     }
@@ -158,14 +239,12 @@ state_default:
         // terminate when received exit
         if (strcmp(*argv, "exit") == 0) break;
 
-        // evaluate redirection        
-        int j = 0;
-        while (*(argv + i) != NULL) {
-             
-            j++;
+        for (int j = 0; j < iRedirect; j++) {
+            putchar(*(redirections + j));
         }
+        putchar('\n');
 
-        // create a child to execute config file
+        // create a child to execute specified coreutil command
         pid_t pid = fork();
         // fork failure
         if (pid == -1) {
@@ -217,7 +296,7 @@ state_default:
     return EXIT_SUCCESS;
 }
 
-int main(int argc, char **argv)
+int main(void)
 {
     // create a child to execute config file
     pid_t pid = fork();
