@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdint.h>
+#include <fcntl.h>
 
 #define STATE_DEFAULT                   0
 #define STATE_BACKSLASH                 1
@@ -24,6 +25,8 @@
 #define EXIT_FAIL_CMD_BUFFER_REALLOC    7
 #define EXIT_FAIL_REDIRECT_MALLOC       8
 #define EXIT_FAIL_REDIRECT_PARSE        9
+#define EXIT_FAIL_MISSING_REDIRECT      10
+#define EXIT_FAIL_DUP2                  11
 
 void processRedirectTarget(char** command, char** redirectionsPtr, int* i)
 {
@@ -37,7 +40,7 @@ void processRedirectTarget(char** command, char** redirectionsPtr, int* i)
     }
 
     uint8_t state = STATE_DEFAULT;
-    while (**command != ' ' && **command != '\0') {
+    while (**command != ' ' && **command != '\n' && **command != '\0') {
         switch (state) {
             case STATE_DEFAULT:
                 // escape character prints next character, ignoring self
@@ -250,16 +253,7 @@ state_default:
         // execv expects last element to be NULL to prevent reading forever
         *(argv + argc) = NULL;
         // terminate when received exit
-        if (strcmp(*argv, "exit") == 0) break;
-
-        // redirection parsing
-        for (int j = 0; j < iRedirect; j++) {
-            if (*(redirections + j) != '\0')
-                putchar(*(redirections + j));
-            else
-                putchar(' ');
-        }
-        putchar('\n');
+        if (strcmp(*argv, "exit") == 0) break; 
 
         // create a child to execute specified coreutil command
         pid_t pid = fork();
@@ -270,6 +264,76 @@ state_default:
 
         // child's execution path
         } else if (pid == 0) {
+
+            // redirection parsing
+            int j = 0;
+            while (j < iRedirect) {
+                // process redirection token
+                int flags = 0;
+                int fd_io1 = -1;
+                int fd_io2 = -1;
+
+                #define STDIN 0
+                #define STDOUT 1
+                #define STDERR 2
+
+                // redirects standard output, overwrites file
+                if (strcmp(redirections + j, ">") == 0) {
+                    flags = O_CREAT | O_WRONLY | O_TRUNC;
+                    fd_io1 = STDOUT; 
+                // redirects and appends output to file
+                } else if (strcmp(redirections + j, ">>") == 0) {
+                    flags = O_CREAT | O_WRONLY | O_APPEND;
+                    fd_io1 = STDOUT;
+                // takes input from a file instead of the keyboard
+                } else if (strcmp(redirections + j, "<") == 0) {
+                    flags = O_RDONLY;
+                    fd_io1 = STDIN;
+                // redirects error messages to a file
+                } else if (strcmp(redirections + j, "2>") == 0) {
+                    flags = O_CREAT | O_WRONLY | O_TRUNC;
+                    fd_io1 = STDERR;
+                // redirects both standard output and error to a file
+                } else if (strcmp(redirections + j, "&>") == 0) {
+                    flags = O_CREAT | O_WRONLY | O_TRUNC | O_APPEND;
+                    fd_io1 = STDOUT;
+                    fd_io2 = STDERR;
+                } else {
+                    fprintf(stderr, "Unrecognized I/O redirection token: %s\n",
+                            redirections + j);
+                }
+
+                // iterate to redirection target
+                while (*(redirections + j) != '\0') j++;
+                j++;
+
+                // check if missing target after token
+                if (*(redirections + j) == '\0') {
+                    fprintf(stderr, "Missing target after token");
+                    exit(EXIT_FAIL_MISSING_REDIRECT);
+                }
+
+                // redirect file descriptors of stdio
+                int fd_redirect = open(redirections + j, flags);
+                // redirect stdio
+                if (dup2(fd_redirect, fd_io1) == -1) {
+                    fprintf(stderr, "dup2 failed with fd:%d, flags:%d\n",
+                            fd_io1, flags);
+                    exit(EXIT_FAIL_DUP2);
+                }
+                // if redirecting stdout and stderr
+                if (fd_io2 >= 0) {
+                    if (dup2(fd_redirect, fd_io2) == -1) {
+                        fprintf(stderr, "dup2 failed with fd:%d, flags:%d\n",
+                            fd_io2, flags);
+                        exit(EXIT_FAIL_DUP2);
+                    }
+                }
+
+                // iterate to next token
+                while (*(redirections + j) != '\0') j++;
+                j++;
+            }
 
             char* binPath = malloc(
                 (strlen("./bin/") * sizeof(char)) +
