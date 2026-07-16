@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdint.h>
+#include <fcntl.h>
 
 #define STATE_DEFAULT                   0
 #define STATE_BACKSLASH                 1
@@ -22,6 +23,93 @@
 #define EXIT_FAIL_UNRECOGNIZED_STATE    5
 #define EXIT_FAIL_ARGV_REALLOC          6
 #define EXIT_FAIL_CMD_BUFFER_REALLOC    7
+#define EXIT_FAIL_REDIRECT_MALLOC       8
+#define EXIT_FAIL_REDIRECT_PARSE        9
+#define EXIT_FAIL_MISSING_REDIRECT      10
+#define EXIT_FAIL_DUP2                  11
+
+void processRedirectTarget(char** command, char** redirectionsPtr, int* i)
+{
+    while (**command == ' ' && **command != '\0') {
+        (*command)++;
+    }
+
+    if (**command == '\0') {
+        fprintf(stderr, "Redirect has broken target\n");
+        exit(EXIT_FAIL_REDIRECT_PARSE);
+    }
+
+    uint8_t state = STATE_DEFAULT;
+    while (**command != ' ' && **command != '\n' && **command != '\0') {
+        switch (state) {
+            case STATE_DEFAULT:
+                // escape character prints next character, ignoring self
+                if (**command == '\\') {
+                    state = STATE_BACKSLASH;
+                    (*i)--;
+                // start of double quote, searching for ending quote
+                } else if (**command == '\"') {
+                    state = STATE_DOUBLEQUOTE; 
+                    *(*redirectionsPtr + *i) = '\"';
+                // start of single quote, searching for ending quote
+                } else if (**command == '\'') {
+                    state = STATE_SINGLEQUOTE; 
+                    *(*redirectionsPtr + *i) = '\'';
+                // process two character redirection
+                } else if ((**command == '>' && *(*command+1) == '>') ||
+                        (**command == '2' && *(*command+1) == '>') ||
+                        (**command == '&' && *(*command+1) == '>')) {
+                    *(*redirectionsPtr + *i) = '\0';
+                    (*i)++;
+                    (*command)--;
+                    return;
+                // process single character redirection
+                } else if (**command == '>' || **command == '<') {
+                    *(*redirectionsPtr + *i) = '\0';
+                    (*i)++;
+                    (*command)--;
+                    return;
+                // otherwise, print character normally
+                } else {
+                    *(*redirectionsPtr + *i) = **command;
+                }
+                break;
+            case STATE_BACKSLASH:
+                // prints next character, regardless
+                state = STATE_DEFAULT;
+                *(*redirectionsPtr + *i) = **command;
+                break;
+            case STATE_DOUBLEQUOTE:
+                // found ending quote
+                if (**command == '\"') {
+                    state = STATE_DEFAULT;
+                    *(*redirectionsPtr + *i) = '\"';
+                // otherwise, print character normally, even backslashes
+                } else {
+                    *(*redirectionsPtr + *i) = **command;
+                }
+                break;
+            case STATE_SINGLEQUOTE:
+                // found ending quote
+                if (**command == '\'') {
+                    state = STATE_DEFAULT;
+                    *(*redirectionsPtr + *i) = '\'';
+                // otherwise, print character normally, even backslashes
+                } else {
+                    *(*redirectionsPtr + *i) = **command;
+                }
+                break;
+            default:
+                // unrecognized state
+                fprintf(stderr, "Unrecognized state, %d\n", state);
+                exit(EXIT_FAIL_UNRECOGNIZED_STATE);
+        }
+        (*i)++;
+        (*command)++;
+    }
+    *(*redirectionsPtr + *i) = '\0';
+    (*i)++;
+}
 
 int shell_loop()
 {
@@ -38,8 +126,9 @@ int shell_loop()
         // build command line arguments, malloc maximum amount of arguments
         // argc starts at one, increments on space to default state transition
         int argc = 1;
-        char** argv = malloc(bufferSize * sizeof(char*));
-        char* newCommand = malloc(bufferSize);
+        char** argv = malloc(bufferSize * sizeof(char *) + sizeof(char *));
+        char* newCommand = malloc(bufferSize); 
+        char* redirections = malloc(bufferSize);
         if (argv == NULL) {
             fprintf(stderr, "argv malloc failed.\n");
             exit(EXIT_FAIL_ARGV_MALLOC);
@@ -48,11 +137,16 @@ int shell_loop()
             fprintf(stderr, "Command buffer malloc failed.\n");
             exit(EXIT_FAIL_CMD_BUFFER_MALLOC);
         }
+        if (redirections == NULL) {
+            fprintf(stderr, "Redirections buffer malloc failed.\n");
+            exit(EXIT_FAIL_REDIRECT_MALLOC);
+        }
         // set first argument
         *argv = newCommand;
 
         uint8_t state = STATE_DEFAULT;
         int i = 0;
+        int iRedirect = 0;
         // iterate through user input, parsing arguments by ' ' space delimiter
         while (*command != '\0') {
             switch (state) {
@@ -74,6 +168,26 @@ state_default:
                     } else if (*command == '\'') {
                         state = STATE_SINGLEQUOTE; 
                         *(newCommand + i) = '\'';
+                    // process two character redirection
+                    } else if ((*command == '>' && *(command+1) == '>') ||
+                            (*command == '2' && *(command+1) == '>') ||
+                            (*command == '&' && *(command+1) == '>')) {
+                        *(redirections + iRedirect) = *command;
+                        command++;
+                        *(redirections + iRedirect + 1) = *command;
+                        *(redirections + iRedirect + 2) = '\0';
+                        iRedirect += 3;
+                        command++;
+                        i--;
+                        processRedirectTarget(&command, &redirections, &iRedirect);
+                    // process single character redirection
+                    } else if (*command == '>' || *command == '<') {
+                        *(redirections + iRedirect) = *command;
+                        *(redirections + iRedirect + 1) = '\0';
+                        iRedirect += 2;
+                        command++;
+                        i--;
+                        processRedirectTarget(&command, &redirections, &iRedirect);
                     // otherwise, print character normally
                     } else {
                         *(newCommand + i) = *command;
@@ -127,7 +241,7 @@ state_default:
         // realloc argv to hold as many arguments was found via argc
         argv = realloc(argv, ((size_t)argc * sizeof(char *)) + sizeof(char *));
         // realloc command buffer to how many was written
-        newCommand = realloc(newCommand, (size_t)i * sizeof(char *));
+        newCommand = realloc(newCommand, (size_t)i * sizeof(char) + sizeof(char));
         if (argv == NULL) {
             fprintf(stderr, "argv realloc failed.\n");
             exit(EXIT_FAIL_ARGV_REALLOC);
@@ -138,25 +252,93 @@ state_default:
         }
         // execv expects last element to be NULL to prevent reading forever
         *(argv + argc) = NULL;
-
         // terminate when received exit
-        if (strcmp(*argv, "exit") == 0) break;
+        if (strcmp(*argv, "exit") == 0) break; 
 
-        // create a child to execute config file
+        // create a child to execute specified coreutil command
         pid_t pid = fork();
-
         // fork failure
         if (pid == -1) {
             perror("fork");
             exit(EXIT_FAIL_FORK);
-        
+
         // child's execution path
         } else if (pid == 0) {
+
+            // redirection parsing
+            int j = 0;
+            while (j < iRedirect) {
+                // process redirection token
+                int flags = 0;
+                int fd_io1 = -1;
+                int fd_io2 = -1;
+
+                #define STDIN 0
+                #define STDOUT 1
+                #define STDERR 2
+
+                // redirects standard output, overwrites file
+                if (strcmp(redirections + j, ">") == 0) {
+                    flags = O_CREAT | O_WRONLY | O_TRUNC;
+                    fd_io1 = STDOUT; 
+                // redirects and appends output to file
+                } else if (strcmp(redirections + j, ">>") == 0) {
+                    flags = O_CREAT | O_WRONLY | O_APPEND;
+                    fd_io1 = STDOUT;
+                // takes input from a file instead of the keyboard
+                } else if (strcmp(redirections + j, "<") == 0) {
+                    flags = O_RDONLY;
+                    fd_io1 = STDIN;
+                // redirects error messages to a file
+                } else if (strcmp(redirections + j, "2>") == 0) {
+                    flags = O_CREAT | O_WRONLY | O_TRUNC;
+                    fd_io1 = STDERR;
+                // redirects both standard output and error to a file
+                } else if (strcmp(redirections + j, "&>") == 0) {
+                    flags = O_CREAT | O_WRONLY | O_TRUNC | O_APPEND;
+                    fd_io1 = STDOUT;
+                    fd_io2 = STDERR;
+                } else {
+                    fprintf(stderr, "Unrecognized I/O redirection token: %s\n",
+                            redirections + j);
+                }
+
+                // iterate to redirection target
+                while (*(redirections + j) != '\0') j++;
+                j++;
+
+                // check if missing target after token
+                if (*(redirections + j) == '\0') {
+                    fprintf(stderr, "Missing target after token");
+                    exit(EXIT_FAIL_MISSING_REDIRECT);
+                }
+
+                // redirect file descriptors of stdio
+                int fd_redirect = open(redirections + j, flags);
+                // redirect stdio
+                if (dup2(fd_redirect, fd_io1) == -1) {
+                    fprintf(stderr, "dup2 failed with fd:%d, flags:%d\n",
+                            fd_io1, flags);
+                    exit(EXIT_FAIL_DUP2);
+                }
+                // if redirecting stdout and stderr
+                if (fd_io2 >= 0) {
+                    if (dup2(fd_redirect, fd_io2) == -1) {
+                        fprintf(stderr, "dup2 failed with fd:%d, flags:%d\n",
+                            fd_io2, flags);
+                        exit(EXIT_FAIL_DUP2);
+                    }
+                }
+
+                // iterate to next token
+                while (*(redirections + j) != '\0') j++;
+                j++;
+            }
 
             char* binPath = malloc(
                 (strlen("./bin/") * sizeof(char)) +
                 (strlen(*argv) * sizeof(char)) +
-                1	
+                sizeof(char)	
             );
             strcpy(binPath, "./bin/");
             strcat(binPath, *argv);
@@ -195,7 +377,7 @@ state_default:
     return EXIT_SUCCESS;
 }
 
-int main(int argc, char **argv)
+int main(void)
 {
     // create a child to execute config file
     pid_t pid = fork();
