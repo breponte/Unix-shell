@@ -40,11 +40,8 @@ void processRedirectTarget(char** command, char** redirectionsPtr, int* i)
     while (**command != ' ' && **command != '\0') {
         switch (state) {
             case STATE_DEFAULT:
-                // set null delimiter between arguments
-                if (**command == ' ' || **command == '\n') {
-                    *(*redirectionsPtr + *i) = '\0';
                 // escape character prints next character, ignoring self
-                } else if (**command == '\\') {
+                if (**command == '\\') {
                     state = STATE_BACKSLASH;
                     (*i)--;
                 // start of double quote, searching for ending quote
@@ -59,13 +56,15 @@ void processRedirectTarget(char** command, char** redirectionsPtr, int* i)
                 } else if ((**command == '>' && *(*command+1) == '>') ||
                         (**command == '2' && *(*command+1) == '>') ||
                         (**command == '&' && *(*command+1) == '>')) {
-                    (*i)++;
                     *(*redirectionsPtr + *i) = '\0';
+                    (*i)++;
+                    (*command)--;
                     return;
                 // process single character redirection
                 } else if (**command == '>' || **command == '<') {
                     *(*redirectionsPtr + *i) = '\0';
                     (*i)++;
+                    (*command)--;
                     return;
                 // otherwise, print character normally
                 } else {
@@ -105,6 +104,8 @@ void processRedirectTarget(char** command, char** redirectionsPtr, int* i)
         (*i)++;
         (*command)++;
     }
+    *(*redirectionsPtr + *i) = '\0';
+    (*i)++;
 }
 
 int shell_loop()
@@ -255,6 +256,8 @@ state_default:
         for (int j = 0; j < iRedirect; j++) {
             if (*(redirections + j) != '\0')
                 putchar(*(redirections + j));
+            else
+                putchar(' ');
         }
         putchar('\n');
 
