@@ -73,6 +73,7 @@ int shell_loop()
 
             status = interpretRedirections(redirections, iRedirect);
 
+            // TODO: corrupted infinite loop
             char* binPath = malloc(
                 (strlen("./bin/") * sizeof(char)) +
                 (strlen(*argv) * sizeof(char)) +
