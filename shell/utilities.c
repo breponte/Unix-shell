@@ -1,6 +1,8 @@
 #include "utilities.h"
 
-uint8_t parseCommand(char** command, char** newCommand, uint8_t* state, char** redirections, int* i, int* iRedirect, char*** argv, int* argc) {
+uint8_t parseCommand(char** command, char** newCommand, uint8_t* state,
+                    char** redirections, int* i, int* iRedirect, char*** argv,
+                    int* argc) {
     uint8_t status = EXIT_SUCCESS;
     switch (*state) {
         case STATE_DEFAULT:
@@ -41,6 +43,50 @@ state_default:
                 (*command)++;
                 (*i)--;
                 status = parseRedirectTarget(command, redirections, iRedirect);
+            // process pipe character
+            } else if (**command == '|') {
+                // create temp file
+                FILE *temp_file = tmpfile();
+                if (temp_file == NULL) {
+                    fprintf(stderr, "Error making temp file for piping\n");
+                    return EXIT_FAIL_TEMP_FILE_CREATE;
+                }
+                int fd_temp = fileno(temp_file);
+                
+                // fork a child with the current command
+                pid_t pid = fork();
+                // fork failure
+                if (pid == -1) {
+                    perror("fork");
+                    exit(EXIT_FAIL_FORK);
+
+                // child execution
+                } else if (pid == 0) {
+                    // set STDOUT to temp file
+                    if (dup2(fd_temp, STDOUT) == -1) {
+                        fprintf(stderr, "dup2 failed with fd:%d\n",
+                            STDOUT);
+                        return EXIT_FAIL_DUP2;
+                    }
+                    // end command parsing and move to execution
+                    *(*command + 1) = '\0';
+                // parent execution
+                } else {
+                    // set STDIN to temp file
+                    if (dup2(fd_temp, STDIN) == -1) {
+                        fprintf(stderr, "dup2 failed with fd:%d\n",
+                            STDIN);
+                        return EXIT_FAIL_DUP2;
+                    }
+                    // flush current command
+                    *i = -1;
+                    // wait on child
+                    uint8_t status = join(pid);
+                    if (status != EXIT_SUCCESS) {
+                        fprintf(stderr, "Previous pipe command failed\n");
+                        return status;
+                    }
+                }
             // otherwise, print character normally
             } else {
                 *(*newCommand + *i) = **command;
@@ -182,11 +228,7 @@ uint8_t interpretRedirections(char* redirections, int redirectionsLength) {
         int flags = 0;
         int fd_io1 = -1;
         int fd_io2 = -1;
-
-        #define STDIN 0
-        #define STDOUT 1
-        #define STDERR 2
-
+ 
         // redirects standard output, overwrites file
         if (strcmp(redirections + j, ">") == 0) {
             flags = O_CREAT | O_RDWR | O_TRUNC;

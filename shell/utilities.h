@@ -29,6 +29,12 @@
 #define EXIT_FAIL_REDIRECT_PARSE        9
 #define EXIT_FAIL_MISSING_REDIRECT      10
 #define EXIT_FAIL_DUP2                  11
+#define EXIT_FAIL_TEMP_FILE_CREATE	12
+
+
+#define STDIN 0
+#define STDOUT 1
+#define STDERR 2
 
 uint8_t parseCommand(char** command, char** newCommand, uint8_t* state, char** redirections, int* i, int* iRedirect, char*** argv, int* argc);
 uint8_t parseRedirectTarget(char** command, char** redirectionsPtr, int* i);

@@ -39,7 +39,8 @@ int shell_loop()
         int iRedirect = 0;
         // iterate through user input, parsing arguments by ' ' space delimiter
         while (*command != '\0') {
-            status = parseCommand(&command, &newCommand, &state, &redirections, &i, &iRedirect, &argv, &argc);
+            status = parseCommand(&command, &newCommand, &state, &redirections,
+                                &i, &iRedirect, &argv, &argc);
             i++;
             command++;
         }
@@ -80,10 +81,12 @@ int shell_loop()
             strcpy(binPath, "./bin/");
             strcat(binPath, *argv);
             execv(binPath, argv);
-            execv(*argv, argv);
+            // TODO: file path broken, attempts `cmd` not `./cmd`
+            //execv(*argv, argv);
 
             // execl failure
-            fprintf(stderr, "Failed execv(), exit number %d\n", errno);
+            fprintf(stderr, "Failed execv(), exit number %d with command %s\n",
+                    errno, binPath);
             perror("execv");
             _exit(127);
         }
