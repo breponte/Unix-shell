@@ -4,6 +4,6 @@ This directory contains the source code of all essential command-line tools for 
 
 ## Known Bugs
 
-### Quoted arguments still print quotes
+### [ECHO] Quoted arguments still print quotes
 
 Objective: Design tests to cover quoted arguments case and implement fix to ignore quotes

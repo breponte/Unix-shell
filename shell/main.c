@@ -1,7 +1,6 @@
 #include "utilities.h"
 
-int shell_loop()
-{
+int shell_loop() {
     uint8_t status = EXIT_SUCCESS;
     while (1) {
         /**
@@ -39,7 +38,12 @@ int shell_loop()
         int iRedirect = 0;
         // iterate through user input, parsing arguments by ' ' space delimiter
         while (*command != '\0') {
-            status = parseCommand(&command, &newCommand, &state, &redirections, &i, &iRedirect, &argv, &argc);
+            if (isFirstArg > 0) {
+                while (*command == ' ') command++;
+                isFirstArg = 0;
+            }
+            status = parseCommand(&command, &newCommand, &state, &redirections,
+                                &i, &iRedirect, &argv, &argc);
             i++;
             command++;
         }
@@ -72,6 +76,7 @@ int shell_loop()
 
             status = interpretRedirections(redirections, iRedirect);
 
+            // TODO: corrupted infinite loop
             char* binPath = malloc(
                 (strlen("./bin/") * sizeof(char)) +
                 (strlen(*argv) * sizeof(char)) +
@@ -80,23 +85,32 @@ int shell_loop()
             strcpy(binPath, "./bin/");
             strcat(binPath, *argv);
             execv(binPath, argv);
-            execv(*argv, argv);
 
             // execl failure
-            fprintf(stderr, "Failed execv(), exit number %d\n", errno);
+            fprintf(stderr, "Failed execv(), exit number %d with command %s\n",
+                    errno, binPath);
             perror("execv");
             _exit(127);
         }
 
         // parent execution from this point on...
         status = join(pid);
-        
+
+        // terminate child if not main thread
+        if (pidMain != getpid()) _exit(0); 
+
+        // reset file descriptors
+        dup2(fd_stdin, STDIN);
     }
     return status;
 }
 
-int main(void)
-{
+int main(void) {
+
+    // set main thread
+    pidMain = getpid();
+    fd_stdin = dup(STDIN);
+
     // create a child to execute config file
     pid_t pid = fork();
 
