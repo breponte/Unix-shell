@@ -35,7 +35,8 @@
 #define STDOUT 1
 #define STDERR 2
 
-extern pid_t pidMain;
+extern pid_t pidMain;           // process ID of root/main thread
+extern int fd_stdin;            // saved file descriptor of original stdin
 extern uint8_t isFirstArg;
 
 uint8_t parseCommand(char** command, char** newCommand, uint8_t* state, char** redirections, int* i, int* iRedirect, char*** argv, int* argc);

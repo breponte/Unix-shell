@@ -100,6 +100,10 @@ int shell_loop() {
 
         // terminate child if not main thread
         if (pidMain != getpid()) _exit(0); 
+
+        // reset file descriptors
+        dup2(fd_stdin, STDIN);
+        close(fd_stdin);
     }
     return status;
 }

@@ -1,6 +1,7 @@
 #include "utilities.h"
 
 pid_t pidMain = -1;
+int fd_stdin = STDIN;
 uint8_t isFirstArg = 1;
 
 uint8_t parseCommand(char** command, char** newCommand, uint8_t* state,
@@ -76,6 +77,8 @@ state_default:
                 // parent execution
                 } else {
                     // set STDIN to temp file
+                    // store original stdin
+                    fd_stdin = dup(STDIN);
                     if (dup2(fd_temp, STDIN) == -1) {
                         fprintf(stderr, "dup2 failed with fd:%d\n",
                             STDIN);
