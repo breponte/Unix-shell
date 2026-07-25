@@ -112,6 +112,7 @@ int main(void) {
 
     // set main thread
     pidMain = getpid();
+    fd_stdin = dup(STDIN);
 
     // create a child to execute config file
     pid_t pid = fork();
