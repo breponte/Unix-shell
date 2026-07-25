@@ -1,7 +1,6 @@
 #include "utilities.h"
 
-int shell_loop()
-{
+int shell_loop() {
     uint8_t status = EXIT_SUCCESS;
     while (1) {
         /**
@@ -39,6 +38,10 @@ int shell_loop()
         int iRedirect = 0;
         // iterate through user input, parsing arguments by ' ' space delimiter
         while (*command != '\0') {
+            if (isFirstArg > 0) {
+                while (*command == ' ') command++;
+                isFirstArg = 0;
+            }
             status = parseCommand(&command, &newCommand, &state, &redirections,
                                 &i, &iRedirect, &argv, &argc);
             i++;
@@ -94,13 +97,18 @@ int shell_loop()
 
         // parent execution from this point on...
         status = join(pid);
-        
+
+        // terminate child if not main thread
+        if (pidMain != getpid()) _exit(0); 
     }
     return status;
 }
 
-int main(void)
-{
+int main(void) {
+
+    // set main thread
+    pidMain = getpid();
+
     // create a child to execute config file
     pid_t pid = fork();
 

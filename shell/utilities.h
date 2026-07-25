@@ -31,10 +31,12 @@
 #define EXIT_FAIL_DUP2                  11
 #define EXIT_FAIL_TEMP_FILE_CREATE	12
 
-
 #define STDIN 0
 #define STDOUT 1
 #define STDERR 2
+
+extern pid_t pidMain;
+extern uint8_t isFirstArg;
 
 uint8_t parseCommand(char** command, char** newCommand, uint8_t* state, char** redirections, int* i, int* iRedirect, char*** argv, int* argc);
 uint8_t parseRedirectTarget(char** command, char** redirectionsPtr, int* i);

@@ -1,5 +1,8 @@
 #include "utilities.h"
 
+pid_t pidMain = -1;
+uint8_t isFirstArg = 1;
+
 uint8_t parseCommand(char** command, char** newCommand, uint8_t* state,
                     char** redirections, int* i, int* iRedirect, char*** argv,
                     int* argc) {
@@ -86,6 +89,7 @@ state_default:
                         fprintf(stderr, "Previous pipe command failed\n");
                         return status;
                     }
+                    isFirstArg = 1;
                 }
             // otherwise, print character normally
             } else {
