@@ -85,8 +85,6 @@ int shell_loop() {
             strcpy(binPath, "./bin/");
             strcat(binPath, *argv);
             execv(binPath, argv);
-            // TODO: file path broken, attempts `cmd` not `./cmd`
-            //execv(*argv, argv);
 
             // execl failure
             fprintf(stderr, "Failed execv(), exit number %d with command %s\n",

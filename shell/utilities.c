@@ -86,6 +86,7 @@ state_default:
                     }
                     // flush current command
                     *i = -1;
+                    *argc = 1;
                     // wait on child
                     uint8_t status = join(pid);
                     if (status != EXIT_SUCCESS) {
@@ -131,8 +132,11 @@ state_default:
             // new argument found, process as in default state
             } else {
                 *state = STATE_DEFAULT;
-                *(*argv + *argc) = *newCommand + *i;
-                (*argc)++;
+                // TODO: should ignore redirections as well
+                if (**command != '|') {
+                    *(*argv + *argc) = *newCommand + *i;
+                    (*argc)++;
+                }
                 goto state_default;
             }
             break;

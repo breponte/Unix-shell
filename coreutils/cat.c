@@ -40,11 +40,20 @@ int main(int argc, char** argv)
 
 print_text:
     // iterate through remaining arguments and print them
-    while (argc > 0) {
-        int fd = open(*argv, O_RDONLY);
+    do {
+        int fd = -1;
+        // no program arguments, reads from STDIN
+        if (argc == 0) {
+            fd = dup(STDIN_FILENO);
+        } else {
+            fd = open(*argv, O_RDONLY);
+        }
+
         if (fd == -1) {
             fprintf(stderr, "cat: unable to open file \"%s\"\n", *argv);
-            return EXIT_FAILURE;
+            argv++;
+            argc--;
+            continue;
         }
 
         char buf[BUFSIZE];
@@ -56,7 +65,7 @@ print_text:
 
         argv++;
         argc--;
-    }
+    } while (argc > 0); 
 
     return EXIT_SUCCESS;
 }
