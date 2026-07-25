@@ -101,7 +101,6 @@ int shell_loop() {
 
         // reset file descriptors
         dup2(fd_stdin, STDIN);
-        close(fd_stdin);
     }
     return status;
 }

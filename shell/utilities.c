@@ -77,8 +77,6 @@ state_default:
                 // parent execution
                 } else {
                     // set STDIN to temp file
-                    // store original stdin
-                    // fd_stdin = dup(STDIN);
                     if (dup2(fd_temp, STDIN) == -1) {
                         fprintf(stderr, "dup2 failed with fd:%d\n",
                             STDIN);
@@ -93,6 +91,9 @@ state_default:
                         fprintf(stderr, "Previous pipe command failed\n");
                         return status;
                     }
+                   
+                    // reset read/write file offset to start
+                    lseek(fd_temp, 0, SEEK_SET);
                     isFirstArg = 1;
                 }
             // otherwise, print character normally
